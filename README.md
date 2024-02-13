@@ -4,10 +4,12 @@ This project provides a Python script that allows you to list and rename entitie
 
 The `homeassistant-entity-renamer.py` script provides the following functionality:
 
-- List entities: You can retrieve a list of entities in HomeAssistant and display their friendly names and entity IDs. You can optionally filter entities using a regular expression.
-- Rename entities: You can rename entities by specifying a search regular expression and a replace regular expression (see pythons [re.sub()](https://docs.python.org/3/library/re.html#re.sub)). The script will display a table with the current entity IDs, new entity IDs, and friendly names. It will ask for confirmation before renaming the entities.
-- Preserves the history of renamed entities since it uses the same code path for renaming as the HomeAssistant UI (which preserves history since the release 2022.4). See [this websocket callback](https://github.com/home-assistant/core/blob/2023.7.2/homeassistant/components/config/entity_registry.py#L147).
+-   List entities: You can retrieve a list of entities in HomeAssistant and display their friendly names and entity IDs. You can optionally filter entities using a regular expression.
+-   Rename entities: You can rename entities by specifying a search regular expression and a replace regular expression (see Python's [re.sub()](https://docs.python.org/3/library/re.html#re.sub)). The script will display a table with the current entity IDs, new entity IDs, and friendly names. It will ask for confirmation before renaming the entities.
+-   Update entities from CSV: You can upload a CSV file containing entity IDs and new friendly names to update entity friendly names in bulk.
+-   Search output written to CSV: The script now also writes the search output to a CSV file named `output.csv` in addition to printing it in the terminal.
 
+Preserves the history of renamed entities since it uses the same code path for renaming as the HomeAssistant UI (which preserves history since the release 2022.4). See [this websocket callback](https://github.com/home-assistant/core/blob/2023.7.2/homeassistant/components/config/entity_registry.py#L147).
 
 Tested on HomeAssistant 2023.7.2.
 
