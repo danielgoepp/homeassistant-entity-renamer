@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import argparse
 import re
 import requests
@@ -50,7 +52,7 @@ def list_entities(regex=None):
 
         # Extract entity IDs and friendly names
         entity_data = [(entity['attributes'].get('friendly_name', ''), entity['entity_id']) for entity in data]
-        
+
         # Filter the entity data if regex argument is provided
         if regex:
             filtered_entity_data = [(friendly_name, entity_id) for friendly_name, entity_id in entity_data if
@@ -127,60 +129,13 @@ def rename_entities(entity_data, search_regex, replace_regex):
         else:
             print("Renaming process aborted.")
 
-def update_entity_friendly_names(input_filename):
-    answer = input("\nDo you want to proceed with renaming the entities? (y/N): ")
-    if answer.lower() == "y" or answer.lower() == "yes":
-        websocket_url = f'ws{TLS_S}://{config.HOST}/api/websocket'
-        ws = websocket.WebSocket()
-        ws.connect(websocket_url)
-
-        auth_req = ws.recv()
-
-        # Authenticate with Home Assistant
-        auth_msg = json.dumps({"type": "auth", "access_token": config.ACCESS_TOKEN})
-        ws.send(auth_msg)
-        auth_result = ws.recv()
-        auth_result = json.loads(auth_result)
-        if auth_result["type"] != "auth_ok":
-            print("Authentication failed. Check your access token.")
-            return
-
-        # Update friendly names
-        updated_data = []
-        with open(input_filename, mode='r') as file:
-            reader = csv.DictReader(file)
-            for row in reader:
-                entity_id = row['Entity ID']
-                friendly_name = row['Friendly Name']
-                updated_data.append((friendly_name, entity_id))
-
-        for index, (friendly_name, entity_id) in enumerate(updated_data, start=1):
-            # Update entity friendly name
-            entity_registry_update_msg = json.dumps({
-                "id": index,
-                "type": "config/entity_registry/update",
-                "entity_id": entity_id,
-                "name": friendly_name
-            })
-            ws.send(entity_registry_update_msg)
-            update_result = ws.recv()
-            update_result = json.loads(update_result)
-            if update_result["success"]:
-                print(f"Entity '{entity_id}' renamed to '{friendly_name}' successfully!")
-            else:
-                print(f"Failed to update entity '{entity_id}': {update_result['error']['message']}")
-
-        ws.close()
-    else:
-        print("Renaming process aborted.")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="HomeAssistant Entity Renamer")
-    parser.add_argument('--input-file', dest='input_filename', default='input.csv', help='Input CSV file containing Friendly Name and Entity ID')
     parser.add_argument('--search', dest='search_regex', help='Regular expression for search. Note: Only searches entity IDs.')
     parser.add_argument('--replace', dest='replace_regex', help='Regular expression for replace')
     args = parser.parse_args()
-    
+
     if args.search_regex:
         entity_data = list_entities(args.search_regex)
 
@@ -196,9 +151,4 @@ if __name__ == "__main__":
         else:
             print("No entities found matching the search regex.")
     else:
-        if args.input_filename:
-            input_filename = args.input_filename
-
-            update_entity_friendly_names(input_filename)
-        else: 
-            parser.print_help()
+        parser.print_help()
