@@ -17,7 +17,6 @@ headers = {
     'Content-Type': 'application/json'
 }
 
-
 def align_strings_in_column(table, column, c="."):
     # Get the column data from the table
     column_data = [row[column] for row in table]
@@ -34,8 +33,8 @@ def align_strings_in_column(table, column, c="."):
         tuple(align_string(value) if i == column else value for i, value in enumerate(row))
         for row in table
     ]
-    return modified_table
 
+    return modified_table
 
 def list_entities(regex=None):
     # API endpoint for retrieving all entities
@@ -51,7 +50,7 @@ def list_entities(regex=None):
 
         # Extract entity IDs and friendly names
         entity_data = [(entity['attributes'].get('friendly_name', ''), entity['entity_id']) for entity in data]
-
+        
         # Filter the entity data if regex argument is provided
         if regex:
             filtered_entity_data = [(friendly_name, entity_id) for friendly_name, entity_id in entity_data if
@@ -75,7 +74,6 @@ def write_to_csv(entity_data, filename):
         writer.writerow(["Friendly Name", "Entity ID"])
         for row in entity_data:
             writer.writerow(row)
-
 
 def rename_entities(entity_data, search_regex, replace_regex):
     renamed_data = []
@@ -129,7 +127,6 @@ def rename_entities(entity_data, search_regex, replace_regex):
         else:
             print("Renaming process aborted.")
 
-
 def update_entity_friendly_names(input_filename):
     answer = input("\nDo you want to proceed with renaming the entities? (y/N): ")
     if answer.lower() in ["y", "yes"]:
@@ -177,7 +174,6 @@ def update_entity_friendly_names(input_filename):
     else:
         print("Renaming process aborted.")
 
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="HomeAssistant Entity Renamer")
     parser.add_argument('--input-file', dest='input_filename', default='input.csv', help='Input CSV file containing Friendly Name and Entity ID')
@@ -201,5 +197,5 @@ if __name__ == "__main__":
         input_filename = args.input_filename
 
         update_entity_friendly_names(input_filename)
-    else:
+    else: 
         parser.print_help()
