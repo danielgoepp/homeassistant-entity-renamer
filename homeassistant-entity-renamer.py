@@ -24,7 +24,7 @@ def align_strings(table):
     alignment_char = "."
 
     if len(table) == 0:
-        return
+        return table
     
     for column in range(len(table[0])):
         # Get the column data from the table
@@ -91,9 +91,10 @@ def process_entities(entity_data, search_regex, replace_regex=None, output_file=
         with open(input_filename, mode='r') as file:
             reader = csv.DictReader(file)
             for row in reader:
-                entity_id = row['Entity ID']
-                friendly_name = row['Friendly Name']
-                rename_data.append((friendly_name, entity_id, ""))
+                entity_id = row['Current Entity ID']
+                friendly_name = row.get('Friendly Name', '')  # Check if 'Friendly Name' is present
+                new_entity_id = row.get('New Entity ID', '')  # Check if 'New Entity ID' is present
+                rename_data.append((friendly_name, entity_id, new_entity_id))
 
         if not rename_data:
             print("No data found in the input file.")
@@ -144,20 +145,29 @@ def rename_entities(rename_data):
         return
 
     # Rename the entities
-    for index, (_, entity_id, new_entity_id) in enumerate(rename_data, start=1):
-        entity_registry_update_msg = json.dumps({
+    for index, (friendly_name, entity_id, new_entity_id) in enumerate(rename_data, start=1):
+        entity_registry_update_msg = {
             "id": index,
             "type": "config/entity_registry/update",
             "entity_id": entity_id,
-            "new_entity_id": new_entity_id
-        })
-        ws.send(entity_registry_update_msg)
+        }
+        if new_entity_id:
+            entity_registry_update_msg["new_entity_id"] = new_entity_id
+        if friendly_name:
+            entity_registry_update_msg["name"] = friendly_name
+        ws.send(json.dumps(entity_registry_update_msg))
         update_result = ws.recv()
         update_result = json.loads(update_result)
-        if update_result["success"]:
-            print(f"Entity '{entity_id}' renamed to '{new_entity_id}' successfully!")
+        if update_result.get("success"):
+            success_msg = f"Entity '{entity_id}'"
+            if new_entity_id:
+                success_msg += f" renamed to '{new_entity_id}'"
+            if friendly_name:
+                success_msg += f" with friendly name '{friendly_name}'"
+            success_msg += " successfully!"
+            print(success_msg)
         else:
-            print(f"Failed to rename entity '{entity_id}': {update_result['error']['message']}")
+            print(f"Failed to update entity '{entity_id}': {update_result.get('error', {}).get('message', 'Unknown error')}")
 
     ws.close()
 
@@ -171,7 +181,7 @@ def write_to_csv(table, filename):
 
 def main():
     parser = argparse.ArgumentParser(description="HomeAssistant Entity Renamer")
-    parser.add_argument('--input-file', dest='input_file', help='Input CSV file containing Friendly Name and Entity ID')
+    parser.add_argument('--input-file', dest='input_file', help='Input CSV file containing Friendly Name, Current Entity ID, and New Entity ID')
     parser.add_argument('--search', dest='search_regex', help='Regular expression for search. Note: Only searches entity IDs.')
     parser.add_argument('--replace', dest='replace_regex', help='Regular expression for replace')
     parser.add_argument('--output-file', dest='output_file', help='Output CSV file to export the results')
@@ -194,7 +204,7 @@ def main():
         output_file = args.output_file
 
         process_entities([], None, None, output_file, input_file)
-    else: 
+    else:
         parser.print_help()
 
 if __name__ == "__main__":
