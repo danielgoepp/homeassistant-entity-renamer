@@ -171,37 +171,31 @@ def write_to_csv(table, filename):
 
 def main():
     parser = argparse.ArgumentParser(description="HomeAssistant Entity Renamer")
-    parser.add_argument('--input-file', dest='input_filename', default='input.csv', help='Input CSV file containing Friendly Name and Entity ID')
+    parser.add_argument('--input-file', dest='input_file', help='Input CSV file containing Friendly Name and Entity ID')
     parser.add_argument('--search', dest='search_regex', help='Regular expression for search. Note: Only searches entity IDs.')
     parser.add_argument('--replace', dest='replace_regex', help='Regular expression for replace')
     parser.add_argument('--output-file', dest='output_file', help='Output CSV file to export the results')
     args = parser.parse_args()
 
     # Validate argument combinations
-    if args.search_regex and args.input_filename:
+    if args.search_regex and args.input_file:
         print("Error: --search and --input-file cannot be used together.")
         return
     elif args.replace_regex and not args.search_regex:
         print("Error: --replace requires --search.")
         return
-    elif args.replace_regex and args.output_file and not args.search_regex:
-        print("Error: --output-file requires --search.")
-        return
-
     if args.search_regex:
-        entity_data = list_entities(args.search_regex)
-
-        if entity_data:
+        if entity_data := list_entities(args.search_regex):
             process_entities(entity_data, args.search_regex, args.replace_regex, args.output_file)
         else:
             print("No entities found matching the search regex.")
-    elif args.input_filename:
-        input_filename = args.input_filename
+    elif args.input_file:
+        input_file = args.input_file
         output_file = args.output_file
 
-        process_entities([], None, None, output_file, input_filename)
+        process_entities([], None, None, output_file, input_file)
     else: 
         parser.print_help()
-        
+
 if __name__ == "__main__":
     main()
