@@ -165,7 +165,7 @@ def rename_entities(rename_data):
 def write_to_csv(table, filename):
     with open(filename, mode='w', newline='') as file:
         writer = csv.writer(file)
-        writer.writerow(table)
+        writer.writerows(table)
         print(f"(Table written to {filename})")
 
 
