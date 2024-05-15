@@ -1,11 +1,14 @@
+#!/usr/bin/env python3
+
 import argparse
-import re
-import requests
-import json
-import websocket
 import config
 import csv
+import json
+import re
+import requests
 import tabulate
+import websocket
+
 tabulate.PRESERVE_WHITESPACE = True
 
 # Determine the protocol based on TLS configuration
@@ -17,24 +20,37 @@ headers = {
     'Content-Type': 'application/json'
 }
 
-def align_strings_in_column(table, column, c="."):
-    # Get the column data from the table
-    column_data = [row[column] for row in table]
+def align_strings(table):
+    alignment_char = "."
 
-    # Find the maximum length of the first part of the split strings
-    max_length = max(len(s.split(c)[0]) for s in column_data)
+    if len(table) == 0:
+        return
+    
+    for column in range(len(table[0])):
+        # Get the column data from the table
+        column_data = [row[column] for row in table]
 
-    def align_string(s):
-        s_split = s.split(c)
-        return f"{s_split[0]:>{max_length}}.{s_split[1]}"
+        # Find the maximum length of the first part of the split strings
+        strings_to_align = [s for s in column_data if alignment_char in s]
+        if len(strings_to_align) == 0:
+            continue
+        
+        max_length = max([len(s.split(alignment_char)[0]) for s in strings_to_align])
 
-    # Create the modified table by replacing the column with aligned strings
-    modified_table = [
-        tuple(align_string(value) if i == column else value for i, value in enumerate(row))
-        for row in table
-    ]
+        def align_string(s):
+            s_split = s.split(alignment_char, maxsplit=1)
+            if len(s_split) == 1:
+                return s
+            else:
+                return f"{s_split[0]:>{max_length}}.{s_split[1]}"
 
-    return modified_table
+        # Create the modified table by replacing the column with aligned strings
+        table = [
+            tuple(align_string(value) if i == column else value for i, value in enumerate(row))
+            for row in table
+        ]
+
+    return table
 
 def list_entities(regex=None):
     # API endpoint for retrieving all entities
@@ -68,114 +84,92 @@ def list_entities(regex=None):
         return []
 
 
-def write_to_csv(entity_data, filename):
-    with open(filename, mode='w', newline='') as file:
-        writer = csv.writer(file)
-        writer.writerow(["Friendly Name", "Entity ID"])
-        for row in entity_data:
-            writer.writerow(row)
-
-def rename_entities(entity_data, search_regex, replace_regex, output_file=None):
-    renamed_data = []
-    for friendly_name, entity_id in entity_data:
-        new_entity_id = re.sub(search_regex, replace_regex, entity_id)
-        renamed_data.append((friendly_name, entity_id, new_entity_id))
-
-    # Print the table with friendly name and entity ID
-    table = [("Friendly Name", "Current Entity ID", "New Entity ID")] + align_strings_in_column(align_strings_in_column(renamed_data, 1), 2)
-    print(tabulate.tabulate(table, headers="firstrow", tablefmt="github"))
-
-    # Write to CSV file if output file is provided
-    if output_file:
-        write_to_csv(entity_data, output_file)
-
-    # Ask user for confirmation if replace_regex is provided
-    if replace_regex:
-        answer = input("\nDo you want to proceed with renaming the entities? (y/N): ")
-        if answer.lower() in ["y", "yes"]:
-            websocket_url = f'ws{TLS_S}://{config.HOST}/api/websocket'
-            ws = websocket.WebSocket()
-            ws.connect(websocket_url)
-
-            auth_req = ws.recv()
-
-            # Authenticate with Home Assistant
-            auth_msg = json.dumps({"type": "auth", "access_token": config.ACCESS_TOKEN})
-            ws.send(auth_msg)
-            auth_result = ws.recv()
-            auth_result = json.loads(auth_result)
-            if auth_result["type"] != "auth_ok":
-                print("Authentication failed. Check your access token.")
-                return
-
-            # Rename the entities
-            for index, (_, entity_id, new_entity_id) in enumerate(renamed_data, start=1):
-                entity_registry_update_msg = json.dumps({
-                    "id": index,
-                    "type": "config/entity_registry/update",
-                    "entity_id": entity_id,
-                    "new_entity_id": new_entity_id
-                })
-                ws.send(entity_registry_update_msg)
-                update_result = ws.recv()
-                update_result = json.loads(update_result)
-                if update_result["success"]:
-                    print(f"Entity '{entity_id}' renamed to '{new_entity_id}' successfully!")
-                else:
-                    print(f"Failed to rename entity '{entity_id}': {update_result['error']['message']}")
-
-            ws.close()
-        else:
-            print("Renaming process aborted.")
-
-def update_entity_friendly_names(input_filename):
-    answer = input("\nDo you want to proceed with renaming the entities? (y/N): ")
-    if answer.lower() in ["y", "yes"]:
-        websocket_url = f'ws{TLS_S}://{config.HOST}/api/websocket'
-        ws = websocket.WebSocket()
-        ws.connect(websocket_url)
-
-        auth_req = ws.recv()
-
-        # Authenticate with Home Assistant
-        auth_msg = json.dumps({"type": "auth", "access_token": config.ACCESS_TOKEN})
-        ws.send(auth_msg)
-        auth_result = ws.recv()
-        auth_result = json.loads(auth_result)
-        if auth_result["type"] != "auth_ok":
-            print("Authentication failed. Check your access token.")
-            return
-
-        # Update friendly names
-        updated_data = []
+def process_entities(entity_data, search_regex, replace_regex=None, output_file=None, input_filename=None):
+    rename_data = []
+    if input_filename:
+        # Read data from the input file
         with open(input_filename, mode='r') as file:
             reader = csv.DictReader(file)
             for row in reader:
                 entity_id = row['Entity ID']
                 friendly_name = row['Friendly Name']
-                updated_data.append((friendly_name, entity_id))
+                rename_data.append((friendly_name, entity_id, ""))
 
-        for index, (friendly_name, entity_id) in enumerate(updated_data, start=1):
-            # Update entity friendly name
-            entity_registry_update_msg = json.dumps({
-                "id": index,
-                "type": "config/entity_registry/update",
-                "entity_id": entity_id,
-                "name": friendly_name
-            })
-            ws.send(entity_registry_update_msg)
-            update_result = ws.recv()
-            update_result = json.loads(update_result)
-            if update_result["success"]:
-                print(f"Entity '{entity_id}' renamed to '{friendly_name}' successfully!")
-            else:
-                print(f"Failed to update entity '{entity_id}': {update_result['error']['message']}")
+        if not rename_data:
+            print("No data found in the input file.")
+            return
 
-        ws.close()
     else:
-        print("Renaming process aborted.")
+        if replace_regex:
+            for friendly_name, entity_id in entity_data:
+                new_entity_id = re.sub(search_regex, replace_regex, entity_id)
+                rename_data.append((friendly_name, entity_id, new_entity_id))
+        else:
+            rename_data = [(friendly_name, entity_id, "") for friendly_name, entity_id in entity_data]
 
-if __name__ == "__main__":
+    # Print the table with friendly name and entity ID
+    table = [("Friendly Name", "Current Entity ID", "New Entity ID")] + align_strings(rename_data)
+    print(tabulate.tabulate(table, headers="firstrow", tablefmt="github"))
+
+    # Write to CSV file if output file is provided
+    table = [("Friendly Name", "Current Entity ID", "New Entity ID")] + rename_data
+    if output_file:
+        write_to_csv(table, output_file)
+
+    # Ask user for confirmation if replace_regex is provided or if reading from input file
+    if not replace_regex and not input_filename:
+        return
+
+    answer = input("\nDo you want to proceed with renaming the entities? (y/N): ")
+    if answer.lower() not in ["y", "yes"]:
+        print("Renaming process aborted.")
+        return
+
+    rename_entities(rename_data)
+    
+def rename_entities(rename_data):
+    websocket_url = f'ws{TLS_S}://{config.HOST}/api/websocket'
+    ws = websocket.WebSocket()
+    ws.connect(websocket_url)
+
+    auth_req = ws.recv()
+
+    # Authenticate with Home Assistant
+    auth_msg = json.dumps({"type": "auth", "access_token": config.ACCESS_TOKEN})
+    ws.send(auth_msg)
+    auth_result = ws.recv()
+    auth_result = json.loads(auth_result)
+    if auth_result["type"] != "auth_ok":
+        print("Authentication failed. Check your access token.")
+        return
+
+    # Rename the entities
+    for index, (_, entity_id, new_entity_id) in enumerate(rename_data, start=1):
+        entity_registry_update_msg = json.dumps({
+            "id": index,
+            "type": "config/entity_registry/update",
+            "entity_id": entity_id,
+            "new_entity_id": new_entity_id
+        })
+        ws.send(entity_registry_update_msg)
+        update_result = ws.recv()
+        update_result = json.loads(update_result)
+        if update_result["success"]:
+            print(f"Entity '{entity_id}' renamed to '{new_entity_id}' successfully!")
+        else:
+            print(f"Failed to rename entity '{entity_id}': {update_result['error']['message']}")
+
+    ws.close()
+
+
+def write_to_csv(table, filename):
+    with open(filename, mode='w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow(table)
+        print(f"(Table written to {filename})")
+
+
+def main():
     parser = argparse.ArgumentParser(description="HomeAssistant Entity Renamer")
     parser.add_argument('--input-file', dest='input_filename', default='input.csv', help='Input CSV file containing Friendly Name and Entity ID')
     parser.add_argument('--search', dest='search_regex', help='Regular expression for search. Note: Only searches entity IDs.')
@@ -183,22 +177,31 @@ if __name__ == "__main__":
     parser.add_argument('--output-file', dest='output_file', help='Output CSV file to export the results')
     args = parser.parse_args()
 
+    # Validate argument combinations
+    if args.search_regex and args.input_filename:
+        print("Error: --search and --input-file cannot be used together.")
+        return
+    elif args.replace_regex and not args.search_regex:
+        print("Error: --replace requires --search.")
+        return
+    elif args.replace_regex and args.output_file and not args.search_regex:
+        print("Error: --output-file requires --search.")
+        return
+
     if args.search_regex:
-        if entity_data := list_entities(args.search_regex):
-            if args.replace_regex:
-                rename_entities(entity_data, args.search_regex, args.replace_regex, args.output_file)
-            else:
-                # Print the table with friendly name and entity ID
-                table = [("Friendly Name", "Entity ID")] + align_strings_in_column(entity_data, 1)
-                print(tabulate.tabulate(table, headers="firstrow", tablefmt="github"))
-                # Write to CSV file if output file is provided
-                if args.output_file:
-                    write_to_csv(entity_data, args.output_file)
+        entity_data = list_entities(args.search_regex)
+
+        if entity_data:
+            process_entities(entity_data, args.search_regex, args.replace_regex, args.output_file)
         else:
             print("No entities found matching the search regex.")
     elif args.input_filename:
         input_filename = args.input_filename
+        output_file = args.output_file
 
-        update_entity_friendly_names(input_filename)
+        process_entities([], None, None, output_file, input_filename)
     else: 
         parser.print_help()
+        
+if __name__ == "__main__":
+    main()
