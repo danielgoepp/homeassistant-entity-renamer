@@ -160,13 +160,13 @@ async def rename_entities(rename_data):
     async with websockets.connect(ha_url) as websocket:
 
         auth_request = await websocket.recv()
-        print(f"<<< {auth_request}")
+        # print(f"<<< {auth_request}")
 
         await websocket.send(auth_msg)
-        print(f">>> {auth_msg}")
+        # print(f">>> {auth_msg}")
 
         auth_result = await websocket.recv()
-        print(f"<<< {auth_result}")
+        # print(f"<<< {auth_result}")
 
         # Rename the entities
         for index, (friendly_name, entity_id, new_entity_id) in enumerate(
@@ -183,10 +183,10 @@ async def rename_entities(rename_data):
                 entity_registry_update_msg["name"] = friendly_name
 
             await websocket.send(json.dumps(entity_registry_update_msg))
-            print(f">>> {entity_registry_update_msg}")
+            # print(f">>> {entity_registry_update_msg}")
 
             ws_update_result = await websocket.recv()
-            print(f"<<< {ws_update_result}")
+            # print(f"<<< {ws_update_result}")
 
             update_result = json.loads(ws_update_result)
             if update_result.get("success"):
